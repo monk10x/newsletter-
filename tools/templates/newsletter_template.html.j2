@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ subject }}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#F5F5F5; font-family:{{ font_body }};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F5F5;">
+<tr><td align="center" style="padding:24px 16px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%; background-color:{{ white }};">
+
+<!-- Header -->
+<tr>
+<td style="background-color:{{ white }}; padding:24px 32px; border-bottom:1px solid #E5E5E5;" align="left">
+<img src="cid:{{ logo_cid }}" alt="Monk10x" width="150" style="display:block; border:0;">
+</td>
+</tr>
+
+<!-- Issue meta -->
+<tr>
+<td style="padding:18px 32px 0 32px;">
+<p style="margin:0; font-family:{{ font_mono }}; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:{{ system_gray }};">
+{{ issue_label }}
+</p>
+</td>
+</tr>
+
+<!-- Hook / headline -->
+<tr>
+<td style="padding:6px 32px 0 32px;">
+<h1 style="margin:0; font-family:{{ font_display }}; font-weight:700; font-size:26px; line-height:1.22; color:{{ monk_black }};">
+{{ hook }}
+</h1>
+</td>
+</tr>
+
+<!-- Subhead (one line, not a paragraph) -->
+<tr>
+<td style="padding:8px 32px 0 32px;">
+<p style="margin:0; font-family:{{ font_body }}; font-size:15px; line-height:1.5; color:{{ system_gray }};">
+{{ subhead }}
+</p>
+</td>
+</tr>
+
+<!-- Hero photo -->
+<tr>
+<td style="padding:18px 32px 0 32px;">
+<img src="cid:{{ hero_cid }}" alt="{{ topic }}" width="536" style="display:block; width:100%; max-width:536px; height:auto; border:1px solid #E5E5E5;">
+</td>
+</tr>
+
+<!-- Section: What's happening -->
+<tr>
+<td style="padding:26px 32px 0 32px;">
+<p style="margin:0 0 10px 0; font-family:{{ font_display }}; font-weight:600; font-size:13px; letter-spacing:0.04em; text-transform:uppercase; color:{{ electric_blue }};">
+What's happening
+</p>
+{% for item in whats_happening %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:9px;">
+<tr>
+<td width="26" valign="top" style="padding-top:1px;">
+<table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="20" height="20" align="center" valign="middle" style="background-color:{{ electric_blue }}; color:{{ white }}; font-family:{{ font_display }}; font-weight:700; font-size:11px; border-radius:10px;">{{ loop.index }}</td></tr></table>
+</td>
+<td style="padding:0 0 0 10px;">
+<p style="margin:0; font-family:{{ font_body }}; font-size:14px; line-height:1.5; color:{{ monk_black }};">
+{{ item.point }}
+{% if item.source_url %}<a href="{{ item.source_url }}" style="color:{{ system_gray }}; font-size:12px;">(source)</a>{% endif %}
+</p>
+</td>
+</tr>
+</table>
+{% endfor %}
+</td>
+</tr>
+
+{% if chart_cid %}
+<!-- Section: Business impact -->
+<tr>
+<td style="padding:24px 32px 0 32px;">
+<p style="margin:0 0 10px 0; font-family:{{ font_display }}; font-weight:600; font-size:13px; letter-spacing:0.04em; text-transform:uppercase; color:{{ electric_blue }};">
+Business impact
+</p>
+<img src="cid:{{ chart_cid }}" alt="Business impact chart" width="536" style="display:block; width:100%; max-width:536px; height:auto; border:1px solid #E5E5E5; margin-bottom:10px;">
+{% for item in business_impact_bullets %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
+<tr>
+<td width="6" style="background-color:{{ compound_yellow }};"></td>
+<td style="padding:0 0 0 10px;">
+<p style="margin:0; font-family:{{ font_body }}; font-size:14px; line-height:1.5; color:{{ monk_black }};">
+{{ item.point }}
+{% if item.source_url %}<a href="{{ item.source_url }}" style="color:{{ system_gray }}; font-size:12px;">(source)</a>{% endif %}
+</p>
+</td>
+</tr>
+</table>
+{% endfor %}
+</td>
+</tr>
+{% endif %}
+
+{% if support_cid %}
+<!-- Supporting photo -->
+<tr>
+<td style="padding:20px 32px 0 32px;">
+<img src="cid:{{ support_cid }}" alt="{{ topic }}" width="536" style="display:block; width:100%; max-width:536px; height:auto; border:1px solid #E5E5E5;">
+</td>
+</tr>
+{% endif %}
+
+<!-- Section: The playbook -->
+<tr>
+<td style="padding:24px 32px 0 32px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FFF8E1; border:1px solid {{ compound_yellow }};">
+<tr>
+<td style="padding:16px 20px;">
+<p style="margin:0 0 10px 0; font-family:{{ font_display }}; font-weight:600; font-size:13px; letter-spacing:0.04em; text-transform:uppercase; color:{{ monk_black }};">
+The playbook
+</p>
+{% for item in playbook_bullets %}
+<p style="margin:0 0 6px 0; font-family:{{ font_body }}; font-size:14px; line-height:1.5; color:{{ monk_black }};">
+&#8226;&nbsp; {{ item }}
+</p>
+{% endfor %}
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<!-- Section: Why it matters -->
+<tr>
+<td style="padding:20px 32px 0 32px;">
+<p style="margin:0 0 10px 0; font-family:{{ font_display }}; font-weight:600; font-size:13px; letter-spacing:0.04em; text-transform:uppercase; color:{{ electric_blue }};">
+Why it matters
+</p>
+{% for item in why_it_matters_bullets %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
+<tr>
+<td width="6" style="background-color:{{ electric_blue }};"></td>
+<td style="padding:0 0 0 10px;">
+<p style="margin:0; font-family:{{ font_body }}; font-size:14px; line-height:1.5; color:{{ monk_black }};">
+{{ item }}
+</p>
+</td>
+</tr>
+</table>
+{% endfor %}
+</td>
+</tr>
+
+<!-- CTA -->
+<tr>
+<td align="center" style="padding:24px 32px 6px 32px;">
+<table role="presentation" cellpadding="0" cellspacing="0">
+<tr>
+<td align="center" style="background-color:{{ electric_blue }};">
+<a href="{{ cta_url }}" style="display:inline-block; padding:13px 26px; font-family:{{ font_body }}; font-weight:600; font-size:14px; color:{{ white }}; text-decoration:none;">
+{{ cta_text }}
+</a>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+{% if sources %}
+<!-- Sources -->
+<tr>
+<td style="padding:26px 32px 0 32px;">
+<p style="margin:0 0 8px 0; font-family:{{ font_display }}; font-weight:600; font-size:12px; letter-spacing:0.04em; text-transform:uppercase; color:{{ electric_blue }};">
+Sources
+</p>
+<ol style="margin:0; padding-left:18px; font-family:{{ font_body }}; font-size:11px; line-height:1.6; color:{{ system_gray }};">
+{% for source in sources %}
+<li><a href="{{ source.url }}" style="color:{{ system_gray }};">{{ source.title }}</a></li>
+{% endfor %}
+</ol>
+</td>
+</tr>
+{% endif %}
+
+<!-- Footer -->
+<tr>
+<td style="background-color:{{ monk_black }}; padding:20px 32px; margin-top:20px;">
+<p style="margin:0 0 4px 0; font-family:{{ font_mono }}; font-size:11px; letter-spacing:0.05em; color:{{ system_gray }};">
+{{ tagline }}
+</p>
+<p style="margin:0; font-family:{{ font_body }}; font-size:11px; line-height:1.4; color:{{ system_gray }};">
+Monk10x — AI Automation &amp; Digital Systems. <a href="{{ unsubscribe_note_url }}" style="color:{{ system_gray }};">Unsubscribe</a>
+</p>
+</td>
+</tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>
