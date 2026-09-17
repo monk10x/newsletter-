@@ -282,3 +282,116 @@ PNG/PDF export need a one-time `python -m playwright install chromium` after `pi
   the prompt (very long or compound prompts are more failure-prone).
 - **API keys missing**: the Python tools exit with a clear "Missing X_API_KEY in .env"
   message rather than a stack trace — check `.env` first.
+
+## Automated scheduling (Trigger.dev) — Tue/Thu 9:00 AM IST
+
+A second, unattended entry point exists alongside the interactive pipeline above, added
+2026-09-16. It's a parallel path, not a replacement — Kislay-directed interactive runs still
+work exactly as described in Steps 1-7. This path is for the recurring schedule.
+
+**Why it needed new pieces, not just a cron wrapper around the existing steps:**
+1. Step 1b (research → branded brief) was a judgment call done by the agent in conversation —
+   no code did that job. Added `tools/synthesize_brief.py` (Anthropic API call) to do it
+   programmatically, with a **grounding check**: every cited `source_url` is verified against
+   the URLs Tavily actually returned; ungrounded bullets are dropped and logged, and the run
+   fails loudly if too few grounded bullets survive, rather than silently shipping a thin or
+   fabricated-stat issue.
+2. Drive read/write (Steps 4-5) only worked via the Claude Code MCP connector, which only
+   functions inside an interactive session — unreachable from a headless Trigger.dev task.
+   Added `tools/drive_client.py`, a real Drive API v3 client (OAuth).
+3. There was no automatic topic selection. Added `tools/pick_topic.py` (Anthropic API call),
+   which reads recent-topics history (stored in Drive, `topic_history.json` in the Newsletters
+   folder) so it doesn't repeat an angle.
+
+**Safety choice (Kislay's call, 2026-09-16):** every automated run emails its output to
+**kislayranjan@gmail.com only** — it never bccs the real subscriber list. There is no human
+reviewing LLM-written content before it goes out in this path, so the automated pipeline stops
+at "generate + save to Drive + send me a review copy." The real subscriber send stays a manual
+step (Step 6, `send_newsletter.py --bcc ...`) that Kislay triggers after reading the draft.
+Revisit this once the pipeline's output is trusted enough not to need review.
+
+### Pieces
+| File | Purpose |
+|---|---|
+| `tools/google_auth.py` | Shared OAuth credential loading (local file-based flow, or headless via `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`GOOGLE_REFRESH_TOKEN` env vars). Scopes: `gmail.send` + `drive`. |
+| `tools/drive_client.py` | Drive API v3: upload HTML/binary files, read the subscriber sheet as CSV, read/append topic history. |
+| `tools/pick_topic.py` | Anthropic API — picks a fresh topic, avoiding repeats from history. |
+| `tools/synthesize_brief.py` | Anthropic API — Step 1b as code, with the grounding check described above. |
+| `tools/run_scheduled_issue.py` | Orchestrates the full run end to end; this is the one script Trigger.dev calls. |
+| `trigger.config.ts`, `src/trigger/newsletter.ts` | Node/TypeScript Trigger.dev project — a thin scheduler that invokes `run_scheduled_issue.py` via the `@trigger.dev/python` build extension. All real orchestration logic stays in Python. `trigger.config.ts` also uses the `syncEnvVars` build extension to read `credentials.json`/`token.json`/`.env` locally and push all 6 secrets to Trigger.dev automatically on every deploy — no manual dashboard copy-pasting. |
+
+### Drive layout additions
+- `Monk10x/Newsletters/Auto-archive/` — PDF archives from automated runs (folder ID
+  `1F7bqcLQEQHrisnk7ddhoYxGxGtn-nVbC`).
+- `Monk10x/Newsletters/topic_history.json` — `{"topics": [...]}`, last 30 topics, read by
+  `pick_topic.py` and appended to by the orchestrator (file ID
+  `1Kj-WsW-KU8fJU7qqxIFuMEjandVz5kAP`).
+- Auto-drafts are saved to the same `Newsletters/` folder as manual issues, titled
+  `[Auto-draft] <topic> — <date>` so they're distinguishable at a glance.
+
+### Known constraints specific to this path
+- **The Drive files/folders are owned by `Growth@monk10x.com`, but the local OAuth token
+  authenticates as `kislayranjan@gmail.com`** (confirmed via `drive.about().get()`) — these are
+  different Google accounts. The Monk10x Drive folder had to be explicitly shared with
+  `kislayranjan@gmail.com` (Editor) before `drive_client.py` could see anything in it; a Drive
+  API 404 "File not found" on a file whose ID is definitely correct is the symptom of this,
+  not a real missing-file error. The Claude Code Drive MCP connector could create/read these
+  files but could **not** grant sharing itself ("caller does not have permission") — sharing
+  had to be done manually by Kislay from a browser.
+- **Anthropic's extended thinking returns `ThinkingBlock` items before the `TextBlock`** in
+  `message.content` — code that assumes `message.content[0].text` breaks. Both
+  `pick_topic.py` and `synthesize_brief.py` filter for `block.type == "text"` instead.
+- **`synthesize_brief.py` needs a generous `max_tokens`** (8000, not the 4000 first tried) —
+  the full brief (6-7 + 3-4 sourced bullets plus everything else) plus any thinking tokens can
+  truncate mid-JSON at lower ceilings, which fails JSON parsing with a confusing
+  "Unterminated string" error rather than an obvious token-limit error.
+- **Google Cloud API-enablement changes can take several minutes to propagate** — a freshly
+  enabled Drive API kept 403ing with "has not been used in project... or it is disabled" for
+  a few minutes after actually being enabled in the console. Don't assume the enable failed;
+  retry after a short wait before troubleshooting further.
+- **Playwright/Chromium in Trigger.dev's Python extension environment is unverified** — not
+  documented either way. `run_scheduled_issue.py` treats PDF export as best-effort: on failure
+  it logs a warning and continues (content generation and the review email don't depend on
+  it), rather than failing the whole run over archiving.
+- **Re-running the local OAuth consent flow to widen scopes requires deleting the old
+  `token.json` first** — a cached token with the old (narrower) scope won't automatically
+  request the new one; `google_auth.py`'s docstring notes this.
+- **`npx trigger.dev@latest dev` hangs with zero output in a non-TTY/piped shell** (its
+  interactive TUI needs a real terminal). Set `CI=true` to force plain streaming log output
+  instead — confirmed working, 2026-09-17.
+- **`"Asia/Kolkata"` was rejected at deploy time** with `Invalid IANA timezone`, even though
+  it's the current, correct IANA identifier (confirmed via web search and IANA tzdata) — looks
+  like a lag in Trigger.dev's own supported-timezone validation list, not an error in our
+  config. Worked around with the older alias `"Asia/Calcutta"`, which resolves to the exact
+  same zone (UTC+5:30, no DST) via the tzdata Link table — same actual schedule. If a future
+  Trigger.dev release adds `"Asia/Kolkata"` support, switching back is cosmetic only. See the
+  comment in `src/trigger/newsletter.ts`.
+- **`@trigger.dev/python`/`@trigger.dev/build` must be version-pinned to match `@trigger.dev/sdk`
+  exactly** — an initial setup with `@trigger.dev/python@^3.3.0` alongside `@trigger.dev/sdk@4.6.2`
+  installed `@trigger.dev/build@3.3.17` (an old v3 line) via npm's resolution, and `deploy`
+  refused to run ("Version mismatch... this won't end well") until all three were pinned to the
+  identical `4.6.2`. If a future `npm install` reintroduces a mismatch, check `node_modules/@trigger.dev/*/package.json` versions directly — `package.json`'s declared range can lie if it's a caret range.
+
+### Status: deployed
+- `ANTHROPIC_API_KEY` in `.env` (done, 2026-09-16).
+- Drive folder shared with `kislayranjan@gmail.com` (done, 2026-09-16).
+- Trigger.dev project ref `proj_pepznhnlutbgiphxjbsv` in `trigger.config.ts` (done, 2026-09-17).
+- All 6 secrets (`GOOGLE_CLIENT_ID`/`SECRET`/`REFRESH_TOKEN`, `ANTHROPIC_API_KEY`,
+  `TAVILY_API_KEY`, `KIE_API_KEY`) sync automatically via `syncEnvVars` on every deploy — no
+  manual dashboard entry needed (done, 2026-09-17).
+- `npx trigger.dev@latest dev` verified locally — task appeared in the dashboard, confirmed by
+  Kislay (2026-09-17).
+- **`npx trigger.dev@latest deploy` succeeded — Version 20260917.2 is live in Production**
+  (2026-09-17). The schedule (`0 9 * * 2,4`, `Asia/Calcutta` = IST) is attached to this
+  deployment and will fire automatically Tuesday and Thursday mornings without any local
+  machine needing to be on — confirmed this distinction matters: **Development**-environment
+  schedules only fire while `trigger.dev dev` is running locally; **Production** schedules run
+  entirely on Trigger.dev's infrastructure once deployed. See
+  [Trigger.dev's scheduled tasks docs](https://trigger.dev/docs/tasks/scheduled).
+- **Not yet verified**: an actual scheduled run executing in production (next real firing is
+  the next Tuesday or Thursday 9:00 AM IST after this deployment - today's slot had already
+  passed when this deployed). Playwright/Chromium's behavior inside Trigger.dev's cloud
+  container specifically is therefore still unverified in practice, though the pip install
+  step completed without error during the build. Worth checking the first real run's logs in
+  the Trigger.dev dashboard (Runs tab) to confirm the whole pipeline - not just the build -
+  completes cleanly, and that the review email actually arrives.

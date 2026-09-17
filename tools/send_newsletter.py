@@ -12,13 +12,18 @@ One-time setup (required before first use):
   2. Enable the Gmail API (APIs & Services > Library > Gmail API > Enable).
   3. Configure the OAuth consent screen (External is fine; add your Gmail
      account as a test user if it's in Testing mode).
-  4. Create credentials: APIs & Services > Credentials > Create Credentials >
+  4. Also enable the Google Drive API (needed for tools/drive_client.py's scope).
+  5. Create credentials: APIs & Services > Credentials > Create Credentials >
      OAuth client ID > Application type: Desktop app.
-  5. Download the JSON and save it as credentials.json in the project root
+  6. Download the JSON and save it as credentials.json in the project root
      (gitignored already).
-  6. Run this script once - it opens a browser for consent and caches the
+  7. Run this script once - it opens a browser for consent and caches the
      result as token.json (also gitignored). Later runs reuse it silently
      until the refresh token is revoked.
+
+Credential loading is shared with tools/drive_client.py via tools/google_auth.py, which also
+supports headless (Trigger.dev) auth from GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET/
+GOOGLE_REFRESH_TOKEN env vars instead of local files - see that module's docstring.
 
 Usage:
     python tools/send_newsletter.py \
@@ -44,37 +49,13 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build as build_service
 
 sys.path.insert(0, str(Path(__file__).parent))
 import brand  # noqa: E402
+import google_auth  # noqa: E402
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
-CREDENTIALS_PATH = Path("credentials.json")
-TOKEN_PATH = Path("token.json")
 LOGO_PATH = Path("Brand Assets/monk_logo_transparent.png")
-
-
-def get_credentials() -> Credentials:
-    creds = None
-    if TOKEN_PATH.exists():
-        creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            if not CREDENTIALS_PATH.exists():
-                sys.exit(
-                    "Missing credentials.json in the project root. See the setup "
-                    "instructions at the top of tools/send_newsletter.py."
-                )
-            flow = InstalledAppFlow.from_client_secrets_file(str(CREDENTIALS_PATH), SCOPES)
-            creds = flow.run_local_server(port=0)
-        TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
-    return creds
 
 
 def attach_inline_image(msg: MIMEMultipart, path: Path, content_id: str) -> None:
@@ -126,7 +107,7 @@ def main():
     if args.chart_image:
         images[brand.NEWSLETTER_CHART_CID] = args.chart_image
 
-    creds = get_credentials()
+    creds = google_auth.get_credentials()
     service = build_service("gmail", "v1", credentials=creds)
 
     message = build_message(to, bcc, args.subject, Path(args.html), images)
